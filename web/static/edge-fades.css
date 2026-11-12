@@ -1,0 +1,5 @@
+/* Hosts can supply their own theme color and stacking level. */
+.edge-fades { position: fixed; z-index: var(--edge-fade-z, 10); inset: 0; height: 100vh; pointer-events: none; --edge-fade-color: Canvas; }
+.edge-fades::before, .edge-fades::after { content: ''; position: absolute; left: 0; right: 0; pointer-events: none; }
+.edge-fades::before { top: 0; height: var(--edge-fade-top, 50px); background: linear-gradient(to bottom, var(--edge-fade-color) 0%, var(--edge-fade-color) 30%, color-mix(in srgb, var(--edge-fade-color) 0%, transparent) 100%); }
+.edge-fades::after { bottom: 0; height: var(--edge-fade-bottom, 50px); background: linear-gradient(to top, var(--edge-fade-color), color-mix(in srgb, var(--edge-fade-color) 0%, transparent)); }

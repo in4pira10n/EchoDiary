@@ -117,6 +117,14 @@ turndown.addRule('strikethrough', { filter: ['del', 's', 'strike'], replacement:
 // Keep formats without a lossless Markdown equivalent as safe inline HTML.
 turndown.addRule('htmlFormats', { filter: ['u', 'table'], replacement: (_, node) => `\n\n${node.outerHTML}\n\n` });
 turndown.addRule('task', { filter: 'input', replacement: (_, node) => node.checked ? '[x] ' : '[ ] ' });
+// GFM requires a task label; trimming an empty task turns its checkbox into
+// literal [ ] / [x] text. Safe HTML keeps empty tasks and their state lossless.
+turndown.addRule('emptyTaskList', {
+  filter: node => ['ul', 'ol'].includes(node.localName)
+    && [...node.querySelectorAll('li')].some(item => !item.textContent.trim()
+      && [...item.querySelectorAll('input[type=checkbox]')].some(input => input.closest('li') === item)),
+  replacement: (_, node) => '\n\n' + node.outerHTML + '\n\n',
+});
 turndown.addRule('alignment', {
   filter: node => (alignedTags.has(node.localName) && node.hasAttribute('align'))
     || (['ul', 'ol'].includes(node.localName) && Boolean(node.querySelector('[align]'))),

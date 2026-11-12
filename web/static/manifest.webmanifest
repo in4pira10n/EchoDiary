@@ -7,8 +7,8 @@
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "browser"],
-  "background_color": "#1a1a1a",
-  "theme_color": "#1a1a1a",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "orientation": "any",
   "categories": ["productivity", "lifestyle"],
   "icons": [

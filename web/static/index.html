@@ -2,18 +2,23 @@
 <html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
   <meta name="color-scheme" content="dark light">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="EchoDiary">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <title>EchoDiary</title>
-  <link rel="manifest" href="/manifest.webmanifest?v=20261107-new-icon">
+  <link rel="manifest" href="/manifest.webmanifest?v=20261112-viewport-background">
   <link rel="icon" href="/assets/favicon.ico?v=20261107-new-icon" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png?v=20261107-new-icon">
   <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=20261107-new-icon">
   <script>
+    if (navigator.standalone === true) {
+      const isIPad = /iPad/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      document.documentElement.classList.add('is-ios-pwa', isIPad ? 'is-ipad-pwa' : 'is-iphone-pwa');
+    }
     let saved = 'system';
     try {
       const stored = localStorage.getItem('echodiary.theme');
@@ -30,19 +35,20 @@
     } catch {}
   </script>
   <link rel="stylesheet" href="/kit/css/echokit.css">
-  <link rel="stylesheet" href="/app.css?v=20261111-menu-layout">
-  <script type="module" src="/app.js?v=20261112-system-theme"></script>
+  <link rel="stylesheet" href="/edge-fades.css?v=20261112-page-fades">
+  <link rel="stylesheet" href="/app.css?v=20261112-page-fades">
+  <script type="module" src="/app.js?v=20261112-page-fades"></script>
   <script defer src="/pwa.js?v=20261103-pwa"></script>
 </head>
 <body>
   <div id="diary-app" hidden>
-  <header class="diary-header" id="diary-header"></header>
-  <header class="diary-writing-top" id="writing-top" hidden>
-    <button class="diary-back" id="writing-back" type="button" aria-label="返回所有笔记"></button>
+  <header class="diary-header" id="diary-header" data-edge-fade-control="auto"></header>
+  <header class="diary-writing-top" id="writing-top" data-edge-fade-control="auto" hidden>
+    <button class="diary-back" id="writing-back" type="button" aria-label="返回所有笔记"><span id="writing-back-label">所有笔记</span></button>
     <button class="diary-created" id="writing-created" type="button" aria-label="切换创建与修改时间"></button>
     <div id="writing-share"></div>
   </header>
-  <div class="diary-selection-toolbar" id="selection-toolbar" hidden></div>
+  <div class="diary-selection-toolbar" id="selection-toolbar" data-edge-fade-control="auto" hidden></div>
   <main id="diary-content" aria-label="EchoDiary">
     <section id="notes-view" aria-label="笔记列表">
       <div class="diary-folder-grid" id="folder-grid" hidden></div>
@@ -83,6 +89,25 @@
             <div class="diary-preference-row">
               <div><h3>主色</h3><p>系统配色方案</p></div>
               <label class="diary-accent-picker" aria-label="选择主色"><span id="accent-swatch"></span><input id="accent-color" type="color" value="#30c75a" aria-label="主色"></label>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>正文字号</h3><p>编辑与预览同步生效</p></div>
+              <label class="diary-range-control" aria-label="正文字号"><input id="typography-fontSize" data-typography="fontSize" type="range" min="14" max="24" step="1" aria-label="正文字号"><output for="typography-fontSize"></output></label>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>正文行距</h3><p>文字行之间的距离</p></div>
+              <label class="diary-range-control" aria-label="正文行距"><input id="typography-lineHeight" data-typography="lineHeight" type="range" min="1.4" max="2.6" step="0.1" aria-label="正文行距"><output for="typography-lineHeight"></output></label>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>段间距</h3><p>段落之间的距离</p></div>
+              <label class="diary-range-control" aria-label="段间距"><input id="typography-paragraphSpacing" data-typography="paragraphSpacing" type="range" min="0" max="28" step="2" aria-label="段间距"><output for="typography-paragraphSpacing"></output></label>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>默认字重</h3><p>保留已设置的加粗格式</p></div>
+              <select class="diary-setting-select" id="typography-weight" data-typography="fontWeight" aria-label="默认字重"><option value="300">细体</option><option value="400">常规</option><option value="500">中等</option><option value="600">半粗</option></select>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>重置文字显示</h3><p>恢复默认排版</p></div><button class="diary-plain-button" id="typography-reset" type="button">恢复默认</button>
             </div>
             <div class="diary-preference-row">
               <div><h3>显示日期</h3><p>在笔记卡片中显示创建日期</p></div>
@@ -140,11 +165,11 @@
       </div>
     </section>
   </main>
-  <button id="folder-back" class="diary-back diary-folder-back" type="button" aria-label="返回文件夹" title="返回文件夹" hidden></button>
-  <div id="notes-view-switch" hidden></div>
-  <div class="diary-floating diary-floating--leading" id="add-action"></div>
-  <div class="diary-floating diary-floating--trailing" id="edit-action"></div>
-  <footer class="diary-writing-actions" id="writing-actions" hidden>
+  <button id="folder-back" data-edge-fade-control="auto" class="diary-back diary-folder-back" type="button" aria-label="返回文件夹" title="返回文件夹" hidden></button>
+  <div id="notes-view-switch" data-edge-fade-control="auto" hidden></div>
+  <div class="diary-floating diary-floating--leading" id="add-action" data-edge-fade-control="auto"></div>
+  <div class="diary-floating diary-floating--trailing" id="edit-action" data-edge-fade-control="auto"></div>
+  <footer class="diary-writing-actions" id="writing-actions" data-edge-fade-control="auto" hidden>
     <div id="writing-add-action"></div>
     <div id="writing-mode"></div>
     <div id="writing-delete-action"></div>
@@ -155,9 +180,9 @@
   </div>
   <div class="diary-toast" role="status" id="diary-toast"></div>
   <div class="diary-settings-actions" id="diary-settings-actions" hidden>
-    <div id="settings-refresh-action"></div>
-    <div id="settings-add-action"></div>
-    <div id="settings-shutdown-action"></div>
+    <div id="settings-refresh-action" data-edge-fade-control="auto"></div>
+    <div id="settings-add-action" data-edge-fade-control="auto"></div>
+    <div id="settings-shutdown-action" data-edge-fade-control="auto"></div>
   </div>
   </div>
   <section class="diary-auth-gate" id="auth-gate" hidden aria-labelledby="auth-title">

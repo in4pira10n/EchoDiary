@@ -71,13 +71,22 @@ func TestPWAShellFiles(t *testing.T) {
 	if err := json.Unmarshal(manifest, &payload); err != nil {
 		t.Fatalf("manifest is not valid JSON: %v", err)
 	}
+	if payload["display"] != "standalone" {
+		t.Fatal("PWA manifest must use standalone display mode, matching EchoGallery")
+	}
 
 	index, err := fs.ReadFile(assets, "index.html")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(index), "viewport-fit=cover") || strings.Contains(string(index), `name="apple-mobile-web-app-status-bar-style"`) {
-		t.Fatal("PWA shell must not configure iOS safe-area or translucent status-bar behavior")
+	for _, meta := range []string{
+		`<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`,
+		`<meta name="apple-mobile-web-app-capable" content="yes">`,
+		`<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">`,
+	} {
+		if !strings.Contains(string(index), meta) {
+			t.Fatalf("PWA shell must include EchoGallery's iOS configuration: %s", meta)
+		}
 	}
 }
 

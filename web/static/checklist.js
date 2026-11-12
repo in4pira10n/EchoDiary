@@ -1,4 +1,15 @@
 import { normalizeEditingLists } from './document-structure.js?v=20261111-editor-fixes';
+// WebKit dispatches beforeinput/input synchronously from execCommand. Keep a
+// whole checklist operation atomic: do not re-enter it or save its intermediate DOM.
+const editingChecklists = new WeakSet();
+export const isChecklistEditing = editor => editingChecklists.has(editor);
+
+function editChecklist(editor, change) {
+  if (isChecklistEditing(editor)) return;
+  editingChecklists.add(editor);
+  try { return change(); }
+  finally { editingChecklists.delete(editor); }
+}
 // Controls are runtime-only; content.js saves semantic, safe HTML.
 export function prepareChecklists(container) {
   for (const checkbox of container.querySelectorAll('li input[type=checkbox]')) {
@@ -59,7 +70,79 @@ function includesParagraphs(editor, range) {
   });
 }
 
+function removeCheckbox(item, checkbox) {
+  checkbox.remove();
+  if (!item.textContent && !item.querySelector('br, img, ul, ol')) item.append(document.createElement('br'));
+}
+
+// Keep selection markers inside the moved inline nodes. A live Range alone is
+// relocated to the old parent when WebKit moves a list item out of its list.
+function keepSelection(change) {
+  const selection = getSelection();
+  const range = selection.getRangeAt(0).cloneRange();
+  const collapsed = range.collapsed;
+  const end = document.createComment('selection-end');
+  const start = document.createComment('selection-start');
+  const tail = range.cloneRange(); tail.collapse(false); tail.insertNode(end);
+  range.collapse(true); range.insertNode(start);
+  change();
+  const restored = document.createRange();
+  restored.setStartAfter(start);
+  if (collapsed) restored.collapse(true); else restored.setEndBefore(end);
+  start.remove(); end.remove();
+  selection.removeAllRanges(); selection.addRange(restored);
+}
+
+function unwrapItem(item) {
+  const list = item.parentElement;
+  const trailing = list.cloneNode(false);
+  if (list.tagName === 'OL') {
+    trailing.start = (Number(list.getAttribute('start')) || 1) + [...list.children].indexOf(item) + 1;
+  }
+  while (item.nextSibling) trailing.append(item.nextSibling);
+  const paragraph = document.createElement('p');
+  for (const attribute of ['align', 'style']) {
+    if (item.hasAttribute(attribute)) paragraph.setAttribute(attribute, item.getAttribute(attribute));
+  }
+  checkboxFor(item)?.remove();
+  const nested = [];
+  while (item.firstChild) {
+    const child = item.firstChild;
+    if (child.nodeType === Node.ELEMENT_NODE && child.matches('ul,ol')) { nested.push(child); child.remove(); }
+    else paragraph.append(child);
+  }
+  if (!paragraph.textContent && !paragraph.querySelector('br,img')) paragraph.append(document.createElement('br'));
+  list.after(paragraph);
+  let after = paragraph;
+  for (const child of nested) { after.after(child); after = child; }
+  if (trailing.childNodes.length) after.after(trailing);
+  item.remove();
+  if (!list.children.length) list.remove();
+  return paragraph;
+}
+
+function atTaskStart(item, range) {
+  if (!range.collapsed) return false;
+  const prefix = range.cloneRange();
+  prefix.selectNodeContents(item);
+  prefix.setEnd(range.startContainer, range.startOffset);
+  return !prefix.toString() && !prefix.cloneContents().querySelector('br,img,ul,ol');
+}
+
+export function removeSelectedChecklists(editor, range) {
+  if (!range || !editor.contains(range.commonAncestorContainer)) return;
+  for (const item of selectedItems(editor, range)) {
+    const checkbox = checkboxFor(item);
+    if (checkbox) removeCheckbox(item, checkbox);
+  }
+}
+
 export function toggleChecklist(editor, range) {
+  if (!range || !editor.contains(range.commonAncestorContainer)) return;
+  return editChecklist(editor, () => toggleSelectedChecklist(editor, range));
+}
+
+function toggleSelectedChecklist(editor, range) {
   const selection = getSelection();
   const collapsed = range.collapsed;
   editor.focus({ preventScroll: true });
@@ -86,9 +169,12 @@ export function toggleChecklist(editor, range) {
   }
   if (!items.length) return;
   const remove = items.every(item => checkboxFor(item));
+  if (remove) {
+    keepSelection(() => { for (const item of items) unwrapItem(item); });
+    return;
+  }
   for (const item of items) {
     const checkbox = checkboxFor(item);
-    if (remove) { checkbox.remove(); continue; }
     if (checkbox) continue;
     const caret = document.createRange();
     caret.selectNodeContents(item);
@@ -116,29 +202,46 @@ export function toggleChecklist(editor, range) {
 }
 
 export function handleChecklistInput(event) {
-  if (event.isComposing || event.defaultPrevented || event.inputType !== 'insertParagraph') return;
+  if (event.isComposing || event.defaultPrevented || !['insertParagraph', 'deleteContentBackward'].includes(event.inputType)) return;
   const editor = event.currentTarget;
+  if (isChecklistEditing(editor)) return;
   const item = currentItem(editor);
   const checkbox = item && checkboxFor(item);
   if (!checkbox) return;
+  const range = getSelection().getRangeAt(0);
+  if (event.inputType === 'deleteContentBackward' && !atTaskStart(item, range)) return;
   event.preventDefault();
+  editChecklist(editor, () => {
+    if (event.inputType === 'deleteContentBackward') keepSelection(() => unwrapItem(item));
+    else splitChecklistItem(editor, item, checkbox);
+  });
+  // Only the completed, normalized operation may update the saved note.
+  editor.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function splitChecklistItem(editor, item, checkbox) {
   if (!item.textContent.trim() && !item.querySelector('img, ul, ol')) {
-    checkbox.remove();
-    document.execCommand('outdent', false, null);
-    document.execCommand('formatBlock', false, 'p');
-    normalizeEditingLists(editor);
+    keepSelection(() => unwrapItem(item));
   } else {
+    const range = getSelection().getRangeAt(0);
+    const prefix = range.cloneRange();
+    prefix.selectNodeContents(item);
+    prefix.setEnd(range.startContainer, range.startOffset);
+    const atStart = range.collapsed && !prefix.toString()
+      && !prefix.cloneContents().querySelector('img, ul, ol');
+    const checked = checkbox.checked;
     // Native splitting keeps inline formatting and nested lists intact.
     document.execCommand('insertParagraph', false, null);
     const next = currentItem(editor);
-    if (next) {
+    if (next && next !== item) {
       let input = checkboxFor(next);
       if (!input) { input = document.createElement('input'); input.type = 'checkbox'; next.prepend(input); }
-      input.checked = false; input.removeAttribute('checked');
+      input.checked = atStart && checked;
+      input.toggleAttribute('checked', input.checked);
+      if (atStart) { checkbox.checked = false; checkbox.removeAttribute('checked'); }
       const caret = document.createRange(); caret.setStartAfter(input); caret.collapse(true);
       const selection = getSelection(); selection.removeAllRanges(); selection.addRange(caret);
     }
   }
   prepareChecklists(editor);
-  editor.dispatchEvent(new Event('input', { bubbles: true }));
 }

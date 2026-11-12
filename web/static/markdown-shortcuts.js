@@ -1,4 +1,4 @@
-import { prepareChecklists } from './checklist.js?v=20261111-editor-fixes';
+import { prepareChecklists } from './checklist.js?v=20261112-checklist-exit';
 // Convert only the active paragraph; native commands preserve undo history.
 export function installMarkdownShortcuts(editor) {
   let applying = false;

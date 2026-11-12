@@ -1,9 +1,13 @@
+import { createEdgeFades } from './edge-fades.js?v=20261112-page-fades';
+import { installWritingDateLayout } from './writing-date.js?v=20261112-date-spacing';
+import { installTypographySettings } from './typography.js?v=20261112-date-spacing';
+import { installFixedWritingHeader } from './viewport.js?v=20261112-fixed-header';
 import { installHandoff } from './handoff.js?v=20261107-modal-tone';
 import { createEchoModal } from './diary-modal.js?v=20261107-modal-tone';
-import { installMarkdownShortcuts } from './markdown-shortcuts.js?v=20261111-editor-fixes';
-import { prepareChecklists, toggleChecklist, handleChecklistInput } from './checklist.js?v=20261111-editor-fixes';
+import { installMarkdownShortcuts } from './markdown-shortcuts.js?v=20261112-checklist-exit';
+import { prepareChecklists, toggleChecklist, handleChecklistInput, isChecklistEditing, removeSelectedChecklists } from './checklist.js?v=20261112-checklist-exit';
 import { showContextMenu, closeContextMenu, installContextMenu, fitContextMenu } from './context-menu.js?v=20261111-menu-layout';
-import { sanitizeHTML, markdownHTML, editorHTML, htmlText, htmlMarkdown, requireBodyString, pastedHTML } from './content.js?v=20261111-editor-fixes';
+import { sanitizeHTML, markdownHTML, editorHTML, htmlText, htmlMarkdown, requireBodyString, pastedHTML } from './content.js?v=20261112-checklist-exit';
 import { normalizeParagraphs, normalizeEditingLists } from './document-structure.js?v=20261111-editor-fixes';
 import { createEchoButton } from '/kit/components/button/index.js';
 import { createEchoTabs } from '/kit/components/tab/index.js';
@@ -12,6 +16,8 @@ import { createEchoSettingRow } from '/kit/components/setting-row/index.js';
 import { createEchoLibraryCard } from '/kit/components/library-card/index.js';
 import { createEchoMetric } from '/kit/components/metric/index.js';
 import { installEchoIcons, resolveEchoIcon } from '/kit/components/icon.js';
+
+installFixedWritingHeader();
 
 const legacyNotesCacheKey = 'echodiary.ui-notes';
 
@@ -84,6 +90,8 @@ try { notesView = localStorage.getItem('echodiary.notes-view') === 'all' ? 'all'
 let selectionReturnPage = 'list';
 let writingNoteId = '';
 let writingDateMode = 'created';
+let writingDateLayout;
+let pageFades;
 let writingView = 0;
 let writingEditView = 0;
 let writingHTMLBaseline = '';
@@ -428,6 +436,7 @@ function renderWritingDate() {
   const date = parseNoteDate(value);
   const formatted = date ? `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` : String(value || '').replace(/^(创建于|修改于)[：:]\s*/, '');
   $('#writing-created').textContent = addPanguSpacing(`${modified ? '修改于' : '创建于'}：${formatted}`);
+  writingDateLayout?.update();
 }
 
 $('#writing-created').addEventListener('click', () => {
@@ -529,7 +538,7 @@ function openLibraryAvatarCrop(file) {
     const image = document.createElement('img'); image.alt = '头像裁剪预览'; stage.append(image);
     const toolbar = document.createElement('div'); toolbar.className = 'diary-avatar-crop-toolbar'; toolbar.setAttribute('aria-label', '缩放');
     const zoomOut = document.createElement('button'); zoomOut.type = 'button'; zoomOut.className = 'diary-avatar-crop-tool'; zoomOut.textContent = '−'; zoomOut.setAttribute('aria-label', '缩小');
-    const controls = document.createElement('label'); controls.className = 'diary-avatar-crop-control';
+    const controls = document.createElement('label'); controls.className = 'diary-avatar-crop-control diary-range-control';
     const controlText = document.createElement('span'); controlText.textContent = '缩放';
     const zoom = document.createElement('input'); zoom.type = 'range'; zoom.min = '1'; zoom.max = '3'; zoom.step = '.01'; zoom.value = '1';
     const zoomValue = document.createElement('output'); zoomValue.className = 'diary-avatar-crop-zoom-value'; zoomValue.textContent = '100%'; zoomValue.htmlFor = zoom.id = 'diary-avatar-crop-zoom';
@@ -1156,8 +1165,11 @@ function renderFolderNavigation() {
   list.hidden = Boolean(showGrid);
   $('#edit-action').hidden = !['list', 'favorites', 'handoff'].includes(page) || Boolean(showGrid);
   const backLabel = writingReturnPage === 'handoff' ? '接力' : writingReturnPage === 'favorites' ? '收藏日记' : notesView === 'folders' && folder ? folder.name : '所有笔记';
-  $('#writing-back').replaceChildren(iconImage('chevron.left'), document.createTextNode(backLabel));
-  $('#writing-back').setAttribute('aria-label', `返回${backLabel}`);
+  // Live note updates must not replace/reload the fixed navigation icon.
+  const label = $('#writing-back-label');
+  if (label.textContent !== backLabel) label.textContent = backLabel;
+  const backButton = $('#writing-back');
+  if (backButton.getAttribute('aria-label') !== `返回${backLabel}`) backButton.setAttribute('aria-label', `返回${backLabel}`);
   if (!showGrid) return false;
   const grid = $('#folder-grid'); grid.replaceChildren();
   for (const item of [{ id: '', name: '根目录' }, ...folders.filter(folder => folder.id !== handoffFolderId)]) {
@@ -1404,6 +1416,8 @@ function setPage(next) {
   $('#diary-content').scrollTop = 0;
   if (isTrash) renderTrash();
   if (isList) renderNotes();
+  writingDateLayout?.update();
+  pageFades?.update();
 }
 
 function startSelection() {
@@ -1752,6 +1766,7 @@ function setWritingView(index) {
   document.body.classList.toggle('is-writing-preview', index === 1);
   resizeMarkdownEditor();
   resizeWritingTitle();
+  writingDateLayout?.update();
 }
 
 
@@ -2107,6 +2122,7 @@ function applyWritingDraft(note, draft) {
 }
 
 function updateDraft() {
+  if (isChecklistEditing($('#writing-body'))) return true;
   const note = notes.find(item => item.id === writingNoteId);
   if (!note || writingView === 1) return true;
   // An old or not-yet-rendered editor must never overwrite another note.
@@ -2368,10 +2384,7 @@ function applyWritingFormat(format, targetRange) {
   }
   const listItem = block.closest('li');
   if (['paragraph', 'insertUnorderedList', 'insertOrderedList'].includes(format)) {
-    const container = listItem || block;
-    container.querySelectorAll('input[type=checkbox]').forEach(input => {
-      if (!listItem || input.closest('li') === listItem) input.remove();
-    });
+    removeSelectedChecklists(editor, range);
   }
   if (format === 'paragraph' && listItem) {
     document.execCommand(listItem.parentElement.tagName === 'OL' ? 'insertOrderedList' : 'insertUnorderedList', false, null);
@@ -2511,7 +2524,7 @@ const systemThemeQuery = window.matchMedia?.('(prefers-color-scheme: light)');
 
 function updateThemeColor() {
   const dark = document.documentElement.dataset.theme === 'dark';
-  $('meta[name="theme-color"]').content = dark ? (page === 'writing' ? '#000000' : '#1a1a1a') : '#f7f4ef';
+  $('meta[name="theme-color"]').content = dark ? '#000000' : '#f7f4ef';
 }
 
 function applyResolvedTheme(theme) {
@@ -2568,16 +2581,22 @@ accentInput.addEventListener('input', () => {
   try { localStorage.setItem('echodiary.accent', color); } catch {}
 });
 
+installTypographySettings({ onChange: () => { resizeMarkdownEditor(); resizeWritingTitle(); writingDateLayout?.update(); } });
+
 const showDateInput = $('#show-date');
 let showDatePreference = true;
 try { showDatePreference = localStorage.getItem('echodiary.show-date') !== 'false'; } catch {}
 showDateInput.checked = showDatePreference;
 showDateInput.addEventListener('change', () => {
   try { localStorage.setItem('echodiary.show-date', String(showDateInput.checked)); } catch {}
-  $('#writing-created').hidden = !showDateInput.checked;
+  writingDateLayout.update();
   renderNotes();
 });
-$('#writing-created').hidden = !showDateInput.checked;
+writingDateLayout = installWritingDateLayout({
+  header: $('#writing-top'), date: $('#writing-created'), title: $('#writing-title'),
+  content: $('#diary-content'), back: $('#writing-back'), share: $('#writing-share'),
+  isPreview: () => writingView === 1, isEnabled: () => showDateInput.checked,
+});
 $('#note-sort').value = noteSortRule;
 $('#note-sort').addEventListener('change', event => {
   noteSortRule = event.target.value;
@@ -2663,8 +2682,7 @@ $('#writing-mode').append(createEchoSegmented({
   onChange: setWritingView,
 }));
 
-$('#writing-back').append(iconImage('chevron.left'));
-$('#writing-back').append(document.createTextNode('所有笔记'));
+$('#writing-back').prepend(iconImage('chevron.left'));
 $('#writing-back').addEventListener('click', returnFromWriting);
 $('#writing-title').addEventListener('input', () => { resizeWritingTitle(); updateDraft(); });
 installMarkdownShortcuts($('#writing-body'));
@@ -2738,12 +2756,6 @@ document.addEventListener('selectionchange', () => {
   if (page !== 'writing') return;
   const range = currentWritingRange();
   if (range) savedWritingRange = range;
-});
-$('#diary-content').addEventListener('scroll', event => {
-  if (page !== 'writing') return;
-  const nextTop = event.currentTarget.scrollTop;
-  const writingTop = $('#writing-top');
-  writingTop.classList.toggle('is-created-hidden', nextTop >= 1);
 });
 document.addEventListener('pointerdown', event => {
   if (!activeInsertMenu) return;
@@ -2956,5 +2968,11 @@ async function initializeDiary() {
     $('#auth-error').hidden = false;
   }
 }
+
+pageFades = createEdgeFades({
+  container: $('#diary-app'), className: 'diary-page-fades',
+  controls: () => document.querySelectorAll('[data-edge-fade-control]'),
+});
+createEdgeFades({ container: $('#auth-gate'), className: 'diary-page-fades' });
 
 void initializeDiary();
