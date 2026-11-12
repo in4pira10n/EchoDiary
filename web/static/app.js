@@ -2,7 +2,7 @@ import { installHandoff } from './handoff.js?v=20261107-modal-tone';
 import { createEchoModal } from './diary-modal.js?v=20261107-modal-tone';
 import { installMarkdownShortcuts } from './markdown-shortcuts.js?v=20261111-editor-fixes';
 import { prepareChecklists, toggleChecklist, handleChecklistInput } from './checklist.js?v=20261111-editor-fixes';
-import { showContextMenu, closeContextMenu, installContextMenu, fitContextMenu } from './context-menu.js?v=20261112-top-status-bar';
+import { showContextMenu, closeContextMenu, installContextMenu, fitContextMenu } from './context-menu.js?v=20261111-menu-layout';
 import { sanitizeHTML, markdownHTML, editorHTML, htmlText, htmlMarkdown, requireBodyString, pastedHTML } from './content.js?v=20261111-editor-fixes';
 import { normalizeParagraphs, normalizeEditingLists } from './document-structure.js?v=20261111-editor-fixes';
 import { createEchoButton } from '/kit/components/button/index.js';
@@ -2511,7 +2511,7 @@ const systemThemeQuery = window.matchMedia?.('(prefers-color-scheme: light)');
 
 function updateThemeColor() {
   const dark = document.documentElement.dataset.theme === 'dark';
-  $('meta[name="theme-color"]').content = dark ? '#000000' : '#f7f4ef';
+  $('meta[name="theme-color"]').content = dark ? (page === 'writing' ? '#000000' : '#1a1a1a') : '#f7f4ef';
 }
 
 function applyResolvedTheme(theme) {

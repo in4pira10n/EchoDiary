@@ -76,8 +76,8 @@ func TestPWAShellFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(index), "viewport-fit=cover") || !strings.Contains(string(index), `name="apple-mobile-web-app-status-bar-style" content="black-translucent"`) {
-		t.Fatal("PWA shell must extend its background under the iOS status bar")
+	if strings.Contains(string(index), "viewport-fit=cover") || strings.Contains(string(index), `name="apple-mobile-web-app-status-bar-style"`) {
+		t.Fatal("PWA shell must not configure iOS safe-area or translucent status-bar behavior")
 	}
 }
 
