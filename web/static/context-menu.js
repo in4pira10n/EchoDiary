@@ -3,15 +3,17 @@ import { resolveEchoIcon } from '/kit/components/icon.js';
 let current = null;
 let lastTouchAt = 0;
 
-// Use the visible viewport so menus also fit above an on-screen keyboard.
+// Keep menus inside the visible viewport and below the status bar.
 export function fitContextMenu(menu, { x, y, anchor, gap = 16 }) {
   const viewport = window.visualViewport;
   const position = () => {
     const margin = 12;
     const left = (viewport?.offsetLeft || 0) + margin;
-    const top = (viewport?.offsetTop || 0) + margin;
+    const viewportTop = viewport?.offsetTop || 0;
+    const safeTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--diary-safe-area-top')) || 0;
+    const top = Math.max(viewportTop, safeTop) + margin;
     const width = Math.max(0, (viewport?.width || window.innerWidth) - margin * 2);
-    const height = Math.max(0, (viewport?.height || window.innerHeight) - margin * 2);
+    const height = Math.max(0, viewportTop + (viewport?.height || window.innerHeight) - margin - top);
     menu.style.minWidth = `${Math.min(210, width)}px`;
     menu.style.maxWidth = `${width}px`;
     menu.style.maxHeight = `${height}px`;

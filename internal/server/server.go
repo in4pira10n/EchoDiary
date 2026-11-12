@@ -254,7 +254,7 @@ func Run() error {
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 		w.Header().Set("Service-Worker-Allowed", "/")
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		_, _ = w.Write([]byte(strings.ReplaceAll(string(data), "{{ASSET_VERSION}}", "20261111-menu-layout")))
+		_, _ = w.Write([]byte(strings.ReplaceAll(string(data), "{{ASSET_VERSION}}", "20261112-top-status-bar")))
 	})
 	mux.HandleFunc("/api/auth/status", authStatusHandler(settings, runtimeState, authSessions))
 	mux.HandleFunc("/api/auth/setup", setupHandler(settings, runtimeState, authSessions))
