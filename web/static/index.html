@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <meta name="color-scheme" content="dark light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="EchoDiary">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>EchoDiary</title>
+  <link rel="manifest" href="/manifest.webmanifest?v=20261107-new-icon">
+  <link rel="icon" href="/assets/favicon.ico?v=20261107-new-icon" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png?v=20261107-new-icon">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png?v=20261107-new-icon">
+  <script>
+    try {
+      const saved = localStorage.getItem('echodiary.theme') || 'dark';
+      const theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.dataset.themePreference = saved;
+      document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#000000' : '#f7f4ef';
+      const accent = localStorage.getItem('echodiary.accent');
+      if (accent) document.documentElement.style.setProperty('--diary-accent', accent);
+    } catch {}
+  </script>
+  <link rel="stylesheet" href="/kit/css/echokit.css">
+  <link rel="stylesheet" href="/app.css?v=20261111-menu-layout">
+  <script type="module" src="/app.js?v=20261111-menu-layout"></script>
+  <script defer src="/pwa.js?v=20261103-pwa"></script>
+</head>
+<body>
+  <div id="diary-app" hidden>
+  <header class="diary-header" id="diary-header"></header>
+  <header class="diary-writing-top" id="writing-top" hidden>
+    <button class="diary-back" id="writing-back" type="button" aria-label="返回所有笔记"></button>
+    <button class="diary-created" id="writing-created" type="button" aria-label="切换创建与修改时间"></button>
+    <div id="writing-share"></div>
+  </header>
+  <div class="diary-selection-toolbar" id="selection-toolbar" hidden></div>
+  <main id="diary-content" aria-label="EchoDiary">
+    <section id="notes-view" aria-label="笔记列表">
+      <div class="diary-folder-grid" id="folder-grid" hidden></div>
+      <div class="diary-note-list" id="note-list"></div>
+      <noscript>请启用 JavaScript 以查看 EchoDiary。</noscript>
+    </section>
+    <section id="trash-view" aria-label="回收站" hidden>
+      <div class="diary-note-list diary-trash-list" id="trash-list"></div>
+    </section>
+    <section id="writing-view" class="diary-writing" aria-label="笔记编辑" hidden>
+      <textarea class="diary-writing-title" id="writing-title" aria-label="笔记标题" placeholder="标题" maxlength="200" rows="1"></textarea>
+      <textarea id="writing-markdown" class="diary-writing-markdown" aria-label="Markdown 源文" placeholder="用 Markdown 记录……支持标题、列表、链接、代码块和表格" spellcheck="false" hidden></textarea>
+      <div class="diary-writing-body is-empty" id="writing-body" role="textbox" aria-label="笔记内容" aria-multiline="true" contenteditable="true" data-placeholder="从这里开始记录……"></div>
+      <div class="diary-writing-preview" id="writing-preview" hidden></div>
+      <div class="diary-writing-images" id="writing-images" aria-label="笔记图片"></div>
+      <input id="writing-image-picker" type="file" accept="image/*" multiple hidden>
+    </section>
+    <section id="account-view" class="diary-account" aria-label="账户与外观" hidden>
+      <div class="diary-settings-stack">
+        <section class="diary-settings-group diary-settings-group--libraries">
+          <header class="diary-settings-heading">
+            <img data-echo-icon="building.columns.fill" alt="" aria-hidden="true">
+            <div><h1>资源库</h1><p>切换不同的 Diary 库</p></div>
+            <button class="diary-settings-chevron" type="button" aria-label="收起资源库" aria-expanded="true" data-settings-collapse="libraries"><img data-echo-icon="chevron.down" alt=""></button>
+          </header>
+          <div class="diary-settings-group-content diary-library-grid" id="library-grid" aria-live="polite"></div>
+        </section>
+        <section class="diary-settings-group diary-settings-group--appearance">
+          <header class="diary-settings-heading">
+            <img data-echo-icon="sun.max" alt="" aria-hidden="true">
+            <div><h2>显示与外观</h2><p>调整页面的基本显示设置</p></div>
+            <button class="diary-settings-chevron" type="button" aria-label="收起显示与外观" aria-expanded="true" data-settings-collapse="appearance"><img data-echo-icon="chevron.down" alt=""></button>
+          </header>
+          <div class="diary-settings-group-content">
+            <div class="diary-preference-row">
+              <div><h3>颜色主题</h3><p>深色、浅色或跟随系统</p></div><div id="theme-control"></div>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>主色</h3><p>系统配色方案</p></div>
+              <label class="diary-accent-picker" aria-label="选择主色"><span id="accent-swatch"></span><input id="accent-color" type="color" value="#30c75a" aria-label="主色"></label>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>显示日期</h3><p>在笔记卡片中显示创建日期</p></div>
+              <label class="diary-switch" aria-label="显示日期"><input id="show-date" type="checkbox"><span></span></label>
+            </div>
+          </div>
+        </section>
+        <section class="diary-settings-group diary-settings-group--handoff">
+          <header class="diary-settings-heading">
+            <img data-echo-icon="icloud" alt="" aria-hidden="true">
+            <div><h2>接力</h2><p>与 iOS 快捷指令联动，让笔记随处可用</p></div>
+            <button type="button" aria-label="展开接力设置" aria-expanded="false" data-settings-collapse="handoff"></button>
+          </header>
+          <div class="diary-settings-group-content">
+    <section id="handoff-settings" class="diary-handoff" aria-label="接力设置">
+      <header class="diary-handoff-heading"><div><h2>密钥管理</h2><p id="handoff-summary" class="diary-handoff-muted">创建密钥，与 iOS 设备共享接力笔记</p></div></header>
+      <div id="handoff-keys" class="diary-handoff-keys" aria-live="polite"></div>
+      <div class="diary-handoff-actions">
+        <span id="handoff-add"></span><span id="handoff-get-shortcut"></span><span id="handoff-delete-all"></span>
+      </div>
+    </section>
+          </div>
+        </section>
+        <section class="diary-settings-group diary-settings-group--general">
+          <header class="diary-settings-heading">
+            <img data-echo-icon="gear" alt="" aria-hidden="true">
+            <div><h2>一般</h2><p>通用设置</p></div>
+            <button class="diary-settings-chevron" type="button" aria-label="收起一般设置" aria-expanded="true" data-settings-collapse="general"><img data-echo-icon="chevron.down" alt=""></button>
+          </header>
+          <div class="diary-settings-group-content">
+            <div class="diary-preference-row">
+              <div><h3>管理员</h3><p id="diary-account-name">已登录</p></div>
+              <span class="diary-version">本机账户</span>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>导入可话</h3><p>将已解压的可话动态导入当前资源库</p></div>
+              <button class="diary-plain-button" id="import-kehua" type="button">导入可话</button>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>笔记排序</h3><p>选择笔记列表的排列规则</p></div>
+              <select class="diary-setting-select" id="note-sort" aria-label="笔记排序">
+                <option value="newest">创建时间：从新到旧</option>
+                <option value="oldest">创建时间：从旧到新</option>
+                <option value="modified-newest">修改日期：从新到旧</option>
+                <option value="modified-oldest">修改日期：从旧到新</option>
+                <option value="title">标题</option>
+              </select>
+            </div>
+            <div class="diary-preference-row">
+              <div><h3>EchoDiary 版本</h3><p>v0.0.1</p></div>
+              <button class="diary-plain-button" id="check-updates" type="button">检查更新</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <button id="folder-back" class="diary-back diary-folder-back" type="button" aria-label="返回文件夹" title="返回文件夹" hidden></button>
+  <div id="notes-view-switch" hidden></div>
+  <div class="diary-floating diary-floating--leading" id="add-action"></div>
+  <div class="diary-floating diary-floating--trailing" id="edit-action"></div>
+  <footer class="diary-writing-actions" id="writing-actions" hidden>
+    <div id="writing-add-action"></div>
+    <div id="writing-mode"></div>
+    <div id="writing-delete-action"></div>
+  </footer>
+  <div class="diary-photo-viewer" id="photo-viewer" role="dialog" aria-modal="true" aria-label="图片预览" hidden>
+    <div class="diary-photo-viewer-close" id="photo-viewer-close"></div>
+    <img id="photo-viewer-image" alt="">
+  </div>
+  <div class="diary-toast" role="status" id="diary-toast"></div>
+  <div class="diary-settings-actions" id="diary-settings-actions" hidden>
+    <div id="settings-refresh-action"></div>
+    <div id="settings-add-action"></div>
+    <div id="settings-shutdown-action"></div>
+  </div>
+  </div>
+  <section class="diary-auth-gate" id="auth-gate" hidden aria-labelledby="auth-title">
+    <div class="diary-auth-panel">
+      <div class="diary-auth-brand">
+        <img class="diary-auth-mark" src="/assets/echodiary-icon.png?v=20261107-new-icon" width="512" height="512" alt="EchoDiary">
+        <span>EchoDiary</span>
+      </div>
+      <header class="diary-auth-heading">
+        <h1 id="auth-title">EchoDiary</h1>
+        <p class="diary-auth-tagline" id="auth-tagline">记录此刻，留住回声。</p>
+      </header>
+      <p class="diary-auth-error" id="auth-local-warning" hidden>首次初始化只能在运行 EchoDiary 的主机上完成。请在主机打开 127.0.0.1 地址完成设置。</p>
+      <form id="auth-form" autocomplete="on">
+        <section class="diary-auth-section" id="auth-account-fields">
+          <h2>管理员账户</h2>
+          <div class="diary-auth-fields">
+            <div class="diary-auth-field" id="auth-username-field"><label for="auth-username">账号</label><input id="auth-username" name="username" autocomplete="username" maxlength="80" required></div>
+            <div class="diary-auth-field"><label for="auth-password">密码</label><input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" required></div>
+            <div class="diary-auth-field" id="auth-confirm-field" hidden><label for="auth-confirm">确认密码</label><input id="auth-confirm" name="confirmPassword" type="password" autocomplete="new-password" minlength="8"></div>
+          </div>
+        </section>
+        <section class="diary-auth-section" id="auth-library-fields" hidden>
+          <h2>日记资源库</h2>
+          <div class="diary-auth-fields">
+            <div class="diary-auth-field"><label for="auth-library-name">资源库名称</label><input id="auth-library-name" name="libraryName" maxlength="120" required></div>
+            <div class="diary-auth-field"><label for="auth-library-path">资源库文件夹路径（主机）</label><input id="auth-library-path" name="libraryPath" autocomplete="off" required><small>输入运行 EchoDiary 的主机上的文件夹路径；已有 .echodiary 数据会直接复用。</small></div>
+          </div>
+        </section>
+        <p class="diary-auth-error" id="auth-error" role="alert" hidden></p>
+        <button class="diary-auth-submit" id="auth-submit" type="submit">登录</button>
+      </form>
+    </div>
+  </section>
+</body>
+</html>

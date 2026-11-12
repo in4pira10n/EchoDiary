@@ -1,0 +1,52 @@
+# Build output and local executables
+/build/
+/.build/
+/output/
+/dist/
+/EchoDiary
+/TheEchoAppTestBuild
+*.exe
+*.test
+*.out
+*.prof
+coverage.*
+
+# Personal libraries and runtime state (including nested libraries)
+/Example Dairy/
+.echodiary/
+.echodiary-data/
+.echodiary-library-migration-v1
+entries/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+/settings.json
+
+# Credentials and locally configured Shortcuts
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.shortcut
+
+# Local tools, editor state, and temporary files
+/.playwright-cli/
+/node_modules/
+/.venv/
+__pycache__/
+/.idea/
+/.vscode/
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.swp
+*.swo
+*~
