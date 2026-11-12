@@ -2520,7 +2520,7 @@ function applyResolvedTheme(theme) {
 }
 
 function applyThemePreference(preference) {
-  const mode = ['system', 'light', 'dark'].includes(preference) ? preference : 'dark';
+  const mode = ['system', 'light', 'dark'].includes(preference) ? preference : 'system';
   const prefersLight = systemThemeQuery?.matches;
   const theme = mode === 'system' ? (prefersLight ? 'light' : 'dark') : mode;
   document.documentElement.dataset.themePreference = mode;
@@ -2540,13 +2540,13 @@ else systemThemeQuery?.addListener?.(handleSystemThemeChange);
 
 function restoreSavedThemePreference() {
   setupSystemAppearance = false;
-  let preference = 'dark';
-  try { preference = localStorage.getItem('echodiary.theme') || 'dark'; } catch {}
+  let preference = 'system';
+  try { preference = localStorage.getItem('echodiary.theme') || 'system'; } catch {}
   applyThemePreference(preference);
 }
 
 $('#theme-control').append(createEchoSegmented({
-  ariaLabel: '外观', activeId: ['system', 'light', 'dark'].indexOf(document.documentElement.dataset.themePreference || 'dark'),
+  ariaLabel: '外观', activeId: ['system', 'light', 'dark'].indexOf(document.documentElement.dataset.themePreference || 'system'),
   items: [{ label: '系统', ariaLabel: '跟随系统' }, { label: '浅色' }, { label: '深色' }],
   onChange: index => applyThemePreference(['system', 'light', 'dark'][index]),
 }));

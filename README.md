@@ -169,7 +169,7 @@ All diary, image, and library-management API routes require an authenticated ses
 
 ## UI
 
-The responsive interface uses EchoKit tabs, glass actions, modals, and appearance controls. Dark/light appearance is remembered per browser and defaults to dark.
+The responsive interface uses EchoKit tabs, glass actions, modals, and appearance controls. Appearance follows the system by default; explicit light/dark choices are remembered per browser.
 
 ## Structure
 
